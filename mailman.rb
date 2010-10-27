@@ -23,12 +23,6 @@ class Watchman
 			bot.logger.debug "initializing"
 			@@should_init 	= false
 			@users 			= Users.reload
-			@mailboxes 		= {}
-			@last_seen 		= {} # timestamp of when the user last said something
-			@missed_lines 	= {} # records the # of lines since the user last said something
-			@temp_queue 	= {} # Holds msgs directed at a user who has been idle for < 30 mins || < 50 lines.
-								 # This temp queue gets whiped if the user speakers within that time frame, otherwise
-								 # the msgs are added to their inbox
 		end
 	end
 
@@ -48,11 +42,6 @@ class Watchman
             m.reply "Mailbox already exists"
         else
 			@users[nick] = User.new(nick)
-			#@mailboxes[nick] = Mailbox.new(nick)
-			#@mailboxes[nick] 	= []
-			#@temp_queue[nick] 	= []
-			#@last_seen[nick] 	= Time.now
-			#@missed_lines[nick] = 0
             m.reply "Added a mailbox for #{nick}"
         end
     end
@@ -60,12 +49,6 @@ class Watchman
 
     # fetch a users mail
 	def fetch(m)
-		#mailbox		= load_mailbox nick
-		#mail		= get_mailbox nick
-		#temp_mail 	= get_temp_mailbox nick
-        #mail 		= @mailboxes[nick]
-		#temp_mail 	= @temp_queue[nick]
-
 		nick 		= m.user.nick
 		user = @users[nick]
 
@@ -76,9 +59,6 @@ class Watchman
 			user.mailbox.temp_mailbox.each { |msg| m.reply "From #{msg.user}: #{msg.message}" }
 			user.mailbox.mailbox.each { |msg| m.reply "From #{msg.user}: #{msg.message}" }
 			user.mailbox.empty_mailboxes
-			#temp_mail.each { |msg| m.reply "From #{msg.user}: #{msg.message}" }
-            #mail.each { |msg| m.reply "From #{msg.user}: #{msg.message}" }
-			#empty_boxes nick
         end
     end
 
@@ -92,13 +72,9 @@ class Watchman
 				user.mailbox.temp_mailbox.each { |msg| user.mailbox.send_to_inbox msg }
 				user.mailbox.empty_temp_mailbox
 				user.mailbox.send_to_inbox m
-				#@temp_queue.each { |msg| send_to_mailbox nick, msg }
-				#empty_temp_box nick
-				#send_to_mailbox nick, m
 				m.reply "-.-"
 		    else
 			    # User hasn't be inactive long enough, so put this msg into the temp queue
-				#send_to_temp_mailbox nick, m
 				user.mailbox.send_to_temp m
 		    end
 	    end
@@ -114,7 +90,6 @@ class Watchman
 			user.just_saw
 
 			# Empty the users temp queue since they just spoke
-			#empty_temp_box nick
 			user.mailbox.empty_temp_mailbox
 		end
 
@@ -125,23 +100,18 @@ class Watchman
 			if @users[box_user].is_afk?
 				@users[box_user].mailbox.temp_mailbox.each { |msg| user.mailbox.send_to_inbox msg }
 				@users[box_user].mailbox.empty_temp_mailbox
-				#@temp_queue[box_user].each { |msg| send_to_mailbox box_user, msg }
-				#empty_temp_box box_user
 			end
 
 			if box_user == nick
 				@users[box_user].missed_lines = 0
-				#@missed_lines[box_user] = 0
 			end
 			@users[box_user].missed_lines += 1
-			#@missed_lines[box_user] += 1
 		end
 	end
 
     # Deletes a users mailbox
 	def destroy m
 		@users[m.user.nick].destroy
-        #@mailboxes[m.user.nick] = nil
         m.reply "boom!"
     end
 
@@ -183,8 +153,8 @@ class Watchman
 
 		def initialize nick
 			@nick 			= nick
-			@last_seen 		= Time.now
-			@missed_lines 	= 0
+			@last_seen 		= Time.now # timestamp of when the user last said something
+			@missed_lines 	= 0 # records the # of lines since the user last said something
 			@mailbox 		= Mailbox.new @nick
 			self
 		end
@@ -211,8 +181,10 @@ class Watchman
 	class Mailbox
 
 		def initialize nick
-			@nick = nick
-			@temp_box = []
+			@nick 	  = nick
+			@temp_box = [] # Holds msgs directed at a user who has been idle for < 30 mins || < 50 lines.
+						   # This temp queue gets whiped if the user speakers within that time frame, otherwise
+						   # the msgs are added to their inbox
 			create_or_load_mailbox
 		end
 
@@ -314,49 +286,6 @@ class Watchman
 
 	end
 
-	def load_mailbox nick
-		if @mailboxes[nick] != nil
-			return @mailboxes[nick]
-		else
-			return Mailbox.new(nick)
-		end
-	end
-
-	def send_to_mailbox nick, msg
-		@mailboxes[nick] << msg
-	end
-
-	def send_to_temp_mailbox nick, msg
-		@temp_queue[nick] << msg
-	end
-
-
-
-	def temp_mailbox_empty? nick
-		get_temp_mailbox(nick).empty?
-	end
-
-	def mailbox_size
-	end
-
-
-
-	def is_afk? nick
-		(Time.now - @last_seen[nick]) >= AFK_SEC || @missed_lines[nick] >= AFK_LINES
-	end
-
-	def empty_boxes nick
-		empty_temp_box nick
-		empty_box nick
-	end
-
-	def empty_temp_box nick
-		@temp_queue[nick] = []
-	end
-
-	def empty_box nick
-		@mailboxes[nick] = []
-	end
 end
 
 
@@ -366,8 +295,8 @@ bot = Cinch::Bot.new do
 		c.server = "irc.oftc.net"
 		c.user = "watchman"
 		c.nick = "watchman"
-		#c.channels = ["#sharpiez", "#orb@work", "#irlab"]
-		c.channels = ["#sharpiez"]
+		c.channels = ["#sharpiez", "#orb@work", "#irlab"]
+		#c.channels = ["#sharpiez"]
     end
 end
 
