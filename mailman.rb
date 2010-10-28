@@ -13,7 +13,7 @@ class Watchman
 	match ".destroy", { :method => :destroy }
 	match /\.last .+/, { :method => :last }
 
-	AFK_SEC 	= 1800 # Num of seconds before a user is considered AFK
+	AFK_SEC 	= 1 # Num of seconds before a user is considered AFK
 	AFK_LINES 	=  50 # Num of lines before a user is considered AFK
 	@@should_init = true
 
@@ -51,6 +51,8 @@ class Watchman
 	def fetch(m)
 		nick 		= m.user.nick
 		user = @users[nick]
+		bot.logger.debug "Inbox empty? #{user.mailbox.empty?}"
+		bot.logger.debug "Temp empty? #{user.mailbox.temp_mailbox_empty?}"
 
         if user.mailbox.empty? && user.mailbox.temp_mailbox_empty?
             m.reply "No new mail"
@@ -65,12 +67,14 @@ class Watchman
 
     # add to mailbox if user hasn't been seen for x minutes
 	def send(m)
-		nick = m.message[/^[[A-z0-9]|[-_]]+/]
+		#nick = m.message[/^[[A-z0-9]|[-_]]+/]
+		nick = m.message[/^.[^ :]+/]
+		bot.logger.debug "Nick: #{nick}"
 		user = @users[nick]
 		if Mailbox.exists? nick
 		    if user.is_afk?
-				user.mailbox.temp_mailbox.each { |msg| user.mailbox.send_to_inbox msg }
-				user.mailbox.empty_temp_mailbox
+				#user.mailbox.temp_mailbox.each { |msg| user.mailbox.send_to_inbox msg }
+				#user.mailbox.empty_temp_mailbox
 				user.mailbox.send_to_inbox m
 				m.reply "-.-"
 		    else
@@ -208,9 +212,17 @@ class Watchman
 		end
 
 		def send_to_inbox m
-			f = get_mailbox
-			f.puts m
-			f.close
+			#f = get_mailbox
+			#begin
+			#	msgs = File.open("#{@nick}.box") { |f| Marshal.load(f) }
+			#rescue EOFError
+			#	msgs = []
+			#end
+			#msgs = []
+			#msgs << m
+			#File.open("#{@nick}.box", "w+") { |f| Marshal.dump(msgs, f) }
+			File.open("#{@nick}.box", 'w+') { |f| Marshal.dump(m, f) }
+			#f.close
 		end
 
 		# Determines if the user has a mailbox
@@ -232,9 +244,10 @@ class Watchman
 
 		# Returns the mailbox as an array
 		def mailbox
-			msgs = []
-			get_mailbox.each { |l| msgs << l }
-			msgs
+			Marshal.load(get_mailbox)
+			#msgs = []
+			#get_mailbox.each { |l| msgs << l.chomp }
+			#msgs
 		end
 
 		# Empties box the temp and inboxes
@@ -254,7 +267,7 @@ class Watchman
 		end
 
 		def get_mailbox
-			File.open("#{@nick}.box", "w+")
+			File.open("#{@nick}.box", "a+")
 		end
 
 		def empty?
@@ -295,8 +308,8 @@ bot = Cinch::Bot.new do
 		c.server = "irc.oftc.net"
 		c.user = "watchman"
 		c.nick = "watchman"
-		c.channels = ["#sharpiez", "#orb@work", "#irlab"]
-		#c.channels = ["#sharpiez"]
+		#c.channels = ["#sharpiez", "#orb@work", "#irlab"]
+		c.channels = ["#sharpiez"]
     end
 end
 
